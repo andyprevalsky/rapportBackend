@@ -9,7 +9,7 @@ from flask import (
 )
 import json
 
-cred = credentials.Certificate('/Users/engrbundle/Desktop/flask-tutorial/flaskr/serviceAccountKey.json')
+cred = credentials.Certificate('/Users/ap/Desktop/Projects/myFlask/flaskr/serviceAccountKey.json')
 firebase_admin.initialize_app(cred, {
     'databaseURL': 'https://musicapp-a40f1.firebaseio.com/'
 })
@@ -61,11 +61,14 @@ def getUserData(accessToken, url, time_range=None):
     response = requests.get(url, headers=headers, params=urlencode(body))
     return response.json()
 
-@bp.route('/getHubs/', methods=('GET', 'POST'))
+@bp.route('/getHubs', methods=('GET', 'POST'))
 def getHubInfo():
+    temp = []
     if request.method == 'GET':
-        ref = db.reference('/hubs/')
-        return json.dumps(ref.get())
+        ids = db.reference('/hubs').get()
+        for key in ids.keys():
+            temp.append(key)
+        return jsonify(temp)
 
 @bp.route('/addHub', methods=('GET', 'POST'))
 def createNewHub():
