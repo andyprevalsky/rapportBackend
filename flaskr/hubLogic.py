@@ -10,7 +10,7 @@ from flask import (
 import json
 import os
 
-dir = os.path.dirname(_file_)
+dir = os.path.dirname(__file__)
 serviceKey = os.path.join(dir, 'serviceAccountKey.json')
 cred = credentials.Certificate(serviceKey)
 firebase_admin.initialize_app(cred, {
