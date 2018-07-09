@@ -80,6 +80,22 @@ def getHubInfo():
 def createNewHub():
     ''' creates new Hub with given hubInformation,
     inclduing coordinate and (other stuff TBA) '''
+    if request.method == 'POST':
+        coordData = request.get_json()
+
+        ref = db.reference('/hubs').push({
+            'latlng': {
+                'latitude': coordData['latitude'],
+                'longitude': coordData['longitude']
+            }
+
+            # other stuff about hub, Possibly
+            # Max Users, Genre of Music to be played, etc.
+        })
+        hubId = ref.path.split('/').pop()
+        ref.child('songQueue').set({'userCount': 0})
+        ref.child('artistQueue').set({'userCount': 0})
+        return ref.path
 
     if request.method == 'GET':
         ref = db.reference('/hubs').push({
