@@ -5,14 +5,14 @@ from firebase_admin import credentials
 from firebase_admin import db
 from urllib.parse import urlencode
 from flask import (
-                   Blueprint, redirect, request, jsonify
-                   )
+    Blueprint, redirect, request, jsonify
+)
 import json
 
 cred = credentials.Certificate('/Users/engrbundle/Desktop/flask-tutorial/flaskr/serviceAccountKey.json')
 firebase_admin.initialize_app(cred, {
-                              'databaseURL': 'https://musicapp-a40f1.firebaseio.com/'
-                              })
+    'databaseURL': 'https://musicapp-a40f1.firebaseio.com/'
+})
 db = firebase_admin.db
 
 REDIRECT_URI = 'soundhub://callback'
@@ -23,13 +23,13 @@ bp = Blueprint('hubs', __name__, url_prefix='/hubs')
 
 hubs = {  # this dict will most likely be stored in a SQL table, or possible firebase
     '11111': {  # hubID stored as key for Hub
-    
+
     },
     'xxxxx': {
-    
+
     },
     'yyyyy': {
-    
+
     }  # , etc.
 }
 
@@ -57,7 +57,7 @@ def getUserData(accessToken, url, time_range=None):
     }
     if time_range:
         body['time_range'] = time_range
-    
+
     response = requests.get(url, headers=headers, params=urlencode(body))
     return response.json()
 
@@ -70,19 +70,19 @@ def getHubInfo():
 @bp.route('/addHub', methods=('GET', 'POST'))
 def createNewHub():
     ''' creates new Hub with given hubInformation,
-        inclduing coordinate and (other stuff TBA) '''
-    
+    inclduing coordinate and (other stuff TBA) '''
+
     if request.method == 'GET':
         ref = db.reference('/hubs').push({
-                                         'coordinates': 'placeholder'
-                                         # 'coordinates': request.form['coordinates']
-                                         # other stuff about hub, Possibly
-                                         # Max Users, Genre of Music to be played, etc.
-                                         })
-                                         hubId = ref.path.split('/').pop()
-                                         ref.child('songQueue').set({'userCount': 0})
-                                         ref.child('artistQueue').set({'userCount': 0})
-                                         return ref.path
+            'coordinates': 'placeholder'
+            # 'coordinates': request.form['coordinates']
+            # other stuff about hub, Possibly
+            # Max Users, Genre of Music to be played, etc.
+        })
+        hubId = ref.path.split('/').pop()
+        ref.child('songQueue').set({'userCount': 0})
+        ref.child('artistQueue').set({'userCount': 0})
+        return ref.path
 
 
 def updateSongs(snapshot, songList):
@@ -127,7 +127,7 @@ def addUser():
         userID and hubID (tentative requirements) '''
     if request.method == 'GET':
         return 'used for testing purposes only'
-    
+
     recentlyPlayedURL = 'https://api.spotify.com/v1/me/player/recently-played'
     favoritesURL = 'https://api.spotify.com/v1/me/top/'
     userId = request.form['user_id']
@@ -135,10 +135,10 @@ def addUser():
     refreshToken = db.reference('/users/{}/accountInfo/tokens/RefreshToken'.format(userId)).get()
     accessToken = exchangeTokens(refreshToken)
 
-# queueRef.transaction(lambda snapshot: updateSongs(snapshot))
-# return 'completed'
+    # queueRef.transaction(lambda snapshot: updateSongs(snapshot))
+    # return 'completed'
 
-songList = {}
+    songList = {}
     data = getUserData(accessToken, recentlyPlayedURL)
     for i in range(50):  # gets all recently played track IDs
         trackId = data['items'][i]['track']['id']
@@ -147,13 +147,13 @@ songList = {}
         else:
             songList[trackId] = [data['items'][i]['track']['artists'][0]['id'], 1]
 
-for key in list(songList):
-    if songList[key] == 1:
-        del songList[key]
-    
+    for key in list(songList):
+        if songList[key] == 1:
+            del songList[key]
+
     # recentMultiPlayed is now populated with keys of every songs played
     # more than once and how many times they have been played
-    
+
     rankWeight = 2
     multiplier = 2
     data = getUserData(accessToken, favoritesURL + 'tracks', 'short_term')
@@ -164,7 +164,7 @@ for key in list(songList):
         else:
             songList[trackId] = [data['items'][i]['artists'][0]['id'], rankWeight * multiplier]
         rankWeight -= .02
-    
+
     rankWeight = 2
     multiplier = 1.5
     data = getUserData(accessToken, favoritesURL + 'tracks', 'medium_term')
@@ -175,7 +175,7 @@ for key in list(songList):
         else:
             songList[trackId] = [data['items'][i]['artists'][0]['id'], rankWeight * multiplier]
         rankWeight -= .02
-    
+
     rankWeight = 2
     multiplier = 1
     data = getUserData(accessToken, favoritesURL + 'tracks', 'long_term')
@@ -189,8 +189,8 @@ for key in list(songList):
 
     db.reference('/hubs/{}/songQueue'.format(hubId)).transaction(lambda snapshot: updateSongs(snapshot, songList))
 
-artistList = {}
-    
+    artistList = {}
+
     rankWeight = 2
     multiplier = 2
     data = getUserData(accessToken, favoritesURL + 'artists', 'short_term')
@@ -201,7 +201,7 @@ artistList = {}
         else:
             artistList[artistId] = rankWeight * multiplier
         rankWeight -= .02
-    
+
     rankWeight = 2
     multiplier = 1.5
     data = getUserData(accessToken, favoritesURL + 'artists', 'medium_term')
@@ -212,7 +212,7 @@ artistList = {}
         else:
             artistList[artistId] = rankWeight * multiplier
         rankWeight -= .02
-    
+
     rankWeight = 2
     multiplier = 1
     data = getUserData(accessToken, favoritesURL + 'artists', 'long_term')
@@ -226,6 +226,6 @@ artistList = {}
 
     db.reference('/hubs/{}/artistQueue'.format(hubId)).transaction(lambda snapshot: updateArtists(snapshot, artistList))
 
-return ('Finished Processing the Data!')
-# get user data from spotify
-# parse through data and add to hub
+    return ('Finished Processing the Data!')
+    # get user data from spotify
+    # parse through data and add to hub
