@@ -8,12 +8,17 @@ from flask import (
     Blueprint, redirect, request, jsonify
 )
 import json
+import os
 
-cred = credentials.Certificate('/Users/ap/Desktop/Projects/myFlask/flaskr/serviceAccountKey.json')
+dir = os.path.dirname(_file_)
+serviceKey = os.path.join(dir, 'serviceAccountKey.json')
+cred = credentials.Certificate(serviceKey)
 firebase_admin.initialize_app(cred, {
     'databaseURL': 'https://musicapp-a40f1.firebaseio.com/'
 })
 db = firebase_admin.db
+
+
 
 REDIRECT_URI = 'soundhub://callback'
 S_CLIENT_ID = '5a7e235500fe40509dee5c659b63f316'
@@ -61,13 +66,14 @@ def getUserData(accessToken, url, time_range=None):
     response = requests.get(url, headers=headers, params=urlencode(body))
     return response.json()
 
-@bp.route('/getHubs', methods=('GET', 'POST'))
+@bp.route('/getHubs/', methods=('GET', 'POST'))
 def getHubInfo():
     temp = []
     if request.method == 'GET':
         ids = db.reference('/hubs').get()
-        for key in ids.keys():
-            temp.append(key)
+        for value in ids.values():
+            temp.append(value)
+        print(ids.values())
         return jsonify(temp)
 
 @bp.route('/addHub', methods=('GET', 'POST'))
