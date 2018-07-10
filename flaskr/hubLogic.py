@@ -81,12 +81,13 @@ def createNewHub():
     ''' creates new Hub with given hubInformation,
     inclduing coordinate and (other stuff TBA) '''
     if request.method == 'POST':
-        coordData = request.get_json()
-
+        lat = request.form['lat']
+        lng = request.form['lng']
+        userId = request.form['userId']
         ref = db.reference('/hubs').push({
             'latlng': {
-                'latitude': coordData['latitude'],
-                'longitude': coordData['longitude']
+                'latitude': lat,
+                'longitude': lng
             }
 
             # other stuff about hub, Possibly
@@ -95,7 +96,8 @@ def createNewHub():
         hubId = ref.path.split('/').pop()
         ref.child('songQueue').set({'userCount': 0})
         ref.child('artistQueue').set({'userCount': 0})
-        return ref.path
+        db.reference('/users/{}/accountInfo'.format(userId)).update({ 'hostingHubId': hubId })
+        return 'success'
 
     if request.method == 'GET':
         ref = db.reference('/hubs').push({
