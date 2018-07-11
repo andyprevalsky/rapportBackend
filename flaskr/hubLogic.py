@@ -26,19 +26,6 @@ S_CLIENT_SECRET = 'e551e52e22fa4caeacc4874a1c6a2fa9'
 
 bp = Blueprint('hubs', __name__, url_prefix='/hubs')
 
-hubs = {  # this dict will most likely be stored in a SQL table, or possible firebase
-    '11111': {  # hubID stored as key for Hub
-
-    },
-    'xxxxx': {
-
-    },
-    'yyyyy': {
-
-    }  # , etc.
-}
-
-
 def exchangeTokens(refreshToken):
     body = {
         'grant_type': 'refresh_token',
@@ -96,21 +83,9 @@ def createNewHub():
         hubId = ref.path.split('/').pop()
         ref.child('songQueue').set({'userCount': 0})
         ref.child('artistQueue').set({'userCount': 0})
+        ref.child('recentlyPlayed')
         db.reference('/users/{}/accountInfo'.format(userId)).update({ 'hostingHubId': hubId })
-        return 'success'
-
-    if request.method == 'GET':
-        ref = db.reference('/hubs').push({
-            'coordinates': 'placeholder'
-            # 'coordinates': request.form['coordinates']
-            # other stuff about hub, Possibly
-            # Max Users, Genre of Music to be played, etc.
-        })
-        hubId = ref.path.split('/').pop()
-        ref.child('songQueue').set({'userCount': 0})
-        ref.child('artistQueue').set({'userCount': 0})
-        return ref.path
-
+        return hubId
 
 def updateSongs(snapshot, songList):
     snapshot['userCount'] += 1
@@ -132,7 +107,10 @@ def updateArtists(snapshot, artistList):
     return snapshot
 
 
-def getArtistName(artistId, accessToken):
+def getArtistName(artistId):
+    userId = 'LqqarxhRAPhVF9CQcnSRtGzhSKS2'
+    refreshToken = db.reference('/users/{}/accountInfo/tokens/RefreshToken'.format(userId)).get()
+    accessToken = exchangeTokens(refreshToken)
     headers = {
         'Authorization': 'Bearer ' + accessToken
     }
@@ -140,7 +118,10 @@ def getArtistName(artistId, accessToken):
     return response.json()['name']
 
 
-def getTrackName(trackId, accessToken):
+def getTrackName(trackId):
+    userId = 'LqqarxhRAPhVF9CQcnSRtGzhSKS2'
+    refreshToken = db.reference('/users/{}/accountInfo/tokens/RefreshToken'.format(userId)).get()
+    accessToken = exchangeTokens(refreshToken)
     headers = {
         'Authorization': 'Bearer ' + accessToken
     }
@@ -158,7 +139,7 @@ def addUser():
     recentlyPlayedURL = 'https://api.spotify.com/v1/me/player/recently-played'
     favoritesURL = 'https://api.spotify.com/v1/me/top/'
     userId = request.form['user_id']
-    hubId = '-LGvh2r8o0pISqGd3YqT'  # request.form['hub_id']should also ask for the HUB ID, that is stored in the map data
+    hubId = '-LH8wf5yTvXLbKeonupq'  # request.form['hub_id']should also ask for the HUB ID, that is stored in the map data
     refreshToken = db.reference('/users/{}/accountInfo/tokens/RefreshToken'.format(userId)).get()
     accessToken = exchangeTokens(refreshToken)
 
@@ -256,3 +237,49 @@ def addUser():
     return ('Finished Processing the Data!')
     # get user data from spotify
     # parse through data and add to hub
+
+@bp.route('/getNextSong', methods=('GET', 'POST'))
+def getNextSong():
+    hubId = request.form['hubId']
+    data =  db.reference('/hubs/{}'.format(hubId)).get()
+    songDict = data['songQueue']
+    artistDict = data['artistQueue']
+    recentlyPlayed =  db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).get()
+    userCount = songDict['userCount']
+    temp = {}
+    for key in songDict.keys():
+        if key != 'userCount':
+            temp[key] = [songDict[key][0], getRating(songDict[key], userCount)] #make a new dict with keys of id, -> artist,rating
+    final = (applyArtistWeight(temp, artistDict, userCount))
+    nextSong = max(final.keys(), key=(lambda key: final[key][1]))
+    if recentlyPlayed:
+        while nextSong in recentlyPlayed.keys():
+            del final[nextSong]
+            nextSong = max(final.keys(), key=(lambda key: final[key][1]))
+        incrementRecentlyPlayed(hubId)
+    db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).update({ nextSong: 0 })
+    return jsonify(getTrackName(nextSong))
+
+def incrementRecentlyPlayed(hubId, maxHistoryLength = 19): #up to 20 (maxHistoryLength + 1) songs will be remembered before replaying songs
+    recents = db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).get()
+    temp = {}
+    for key in recents.keys():
+        if recents[key] <= maxHistoryLength:
+            temp[key] = recents[key] + 1
+    print (temp)
+    db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).set(temp)
+    return
+
+def getRating(data, userCount): #gets rating of song/artists by array of values
+    total = 1
+    for item in data:
+        if type(item) == float or type(item) == int:
+            total = total*item
+    return total**(1/userCount)
+
+def applyArtistWeight(toApply, Artists, userCount): #takes a dict, and a dict of artists weights and applys them to said dict
+    for key in Artists.keys():
+        for key2 in toApply.keys():
+            if toApply[key2][0] == key:
+                toApply[key2] = [toApply[key2][0], getRating(Artists[key], userCount) + toApply[key2][1]] #apply weights somehow
+    return toApply
