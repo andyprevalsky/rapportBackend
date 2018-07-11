@@ -89,13 +89,13 @@ def createNewHub():
 
 def updateSongs(snapshot, songList):
     snapshot['userCount'] += 1
+
     for key in songList:
         if key in snapshot.keys():
             snapshot[key].append(songList[key][1])
-        else:
+        else: 
             snapshot[key] = songList[key]
     return snapshot
-
 
 def updateArtists(snapshot, artistList):
     snapshot['userCount'] += 1
@@ -139,7 +139,7 @@ def addUser():
     recentlyPlayedURL = 'https://api.spotify.com/v1/me/player/recently-played'
     favoritesURL = 'https://api.spotify.com/v1/me/top/'
     userId = request.form['user_id']
-    hubId = '-LH8wf5yTvXLbKeonupq'  # request.form['hub_id']should also ask for the HUB ID, that is stored in the map data
+    hubId = request.form['hub_id']
     refreshToken = db.reference('/users/{}/accountInfo/tokens/RefreshToken'.format(userId)).get()
     accessToken = exchangeTokens(refreshToken)
 
@@ -148,7 +148,7 @@ def addUser():
 
     songList = {}
     data = getUserData(accessToken, recentlyPlayedURL)
-    for i in range(50):  # gets all recently played track IDs
+    for i in range(len(data.keys())):  # gets all recently played track IDs
         trackId = data['items'][i]['track']['id']
         if trackId in songList.keys():
             songList[trackId][1] += 1
@@ -165,7 +165,7 @@ def addUser():
     rankWeight = 2
     multiplier = 2
     data = getUserData(accessToken, favoritesURL + 'tracks', 'short_term')
-    for i in range(50):  # gets all track ids of short term
+    for i in range(len(data['items'])):  # gets all track ids of short term
         trackId = data['items'][i]['id']
         if trackId in songList.keys():
             songList[trackId][1] += rankWeight * multiplier
@@ -176,7 +176,7 @@ def addUser():
     rankWeight = 2
     multiplier = 1.5
     data = getUserData(accessToken, favoritesURL + 'tracks', 'medium_term')
-    for i in range(50):
+    for i in range(len(data['items'])):
         trackId = data['items'][i]['id']
         if trackId in songList.keys():
             songList[trackId][1] += rankWeight * multiplier
@@ -187,7 +187,7 @@ def addUser():
     rankWeight = 2
     multiplier = 1
     data = getUserData(accessToken, favoritesURL + 'tracks', 'long_term')
-    for i in range(50):
+    for i in range(len(data['items'])):
         trackId = data['items'][i]['id']
         if trackId in songList.keys():
             songList[trackId][1] += rankWeight * multiplier
@@ -202,7 +202,7 @@ def addUser():
     rankWeight = 2
     multiplier = 2
     data = getUserData(accessToken, favoritesURL + 'artists', 'short_term')
-    for i in range(50):
+    for i in range(len(data['items'])):
         artistId = data['items'][i]['id']
         if artistId in artistList.keys():
             artistList[artistId] += rankWeight * multiplier
@@ -213,7 +213,7 @@ def addUser():
     rankWeight = 2
     multiplier = 1.5
     data = getUserData(accessToken, favoritesURL + 'artists', 'medium_term')
-    for i in range(50):
+    for i in range(len(data['items'])):
         artistId = data['items'][i]['id']
         if artistId in artistList.keys():
             artistList[artistId] += rankWeight * multiplier
@@ -224,7 +224,7 @@ def addUser():
     rankWeight = 2
     multiplier = 1
     data = getUserData(accessToken, favoritesURL + 'artists', 'long_term')
-    for i in range(50):
+    for i in range(len(data['items'])):
         artistId = data['items'][i]['id']
         if artistId in artistList.keys():
             artistList[artistId] += rankWeight * multiplier
@@ -251,6 +251,10 @@ def getNextSong():
         if key != 'userCount':
             temp[key] = [songDict[key][0], getRating(songDict[key], userCount)] #make a new dict with keys of id, -> artist,rating
     final = (applyArtistWeight(temp, artistDict, userCount))
+    temp = {}
+    # for key in final.keys():
+    #     temp[final[key][1]] = getTrackName(key)
+    # return (jsonify(temp))
     nextSong = max(final.keys(), key=(lambda key: final[key][1]))
     if recentlyPlayed:
         while nextSong in recentlyPlayed.keys():
@@ -266,9 +270,24 @@ def incrementRecentlyPlayed(hubId, maxHistoryLength = 19): #up to 20 (maxHistory
     for key in recents.keys():
         if recents[key] <= maxHistoryLength:
             temp[key] = recents[key] + 1
-    print (temp)
     db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).set(temp)
     return
+
+@bp.route('/getPreviousSong', methods=('GET', 'POST'))
+def getPreviousSong():
+    hubId = request.form['hubId']
+    recents = db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).get()
+    recents = decrementRecentlyPlayed(hubId)
+    return getTrackName(min(recents.keys(), key=(lambda key: recents[key])))
+
+def decrementRecentlyPlayed(hubId):
+    recents = db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).get()
+    temp = {}
+    for key in recents.keys():
+        if recents[key] != 0: 
+            temp[key] = recents[key] - 1
+    db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).set(temp)
+    return temp
 
 def getRating(data, userCount): #gets rating of song/artists by array of values
     total = 1
