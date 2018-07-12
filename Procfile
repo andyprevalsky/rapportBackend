@@ -1,1 +1,1 @@
-web: gunicorn flaskr/server:app
+web: cd flask && gunicorn server:app
