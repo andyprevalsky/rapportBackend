@@ -1,6 +1,8 @@
 import os
 
 from flask import Flask
+import auth
+import hubLogic
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
@@ -23,10 +25,11 @@ def create_app(test_config=None):
     def hello():
         return 'Hello, World!'
     
-    from . import auth
+
     app.register_blueprint(auth.bp)
 
-    from . import hubLogic
     app.register_blueprint(hubLogic.bp)
 
     return app
+
+app = create_app()
