@@ -5,7 +5,7 @@ from firebase_admin import credentials
 from firebase_admin import db
 from urllib.parse import urlencode
 from flask import (
-    Blueprint, redirect, request, jsonify
+    Blueprint, redirect, request, jsonify, abort
 )
 import json
 import os
@@ -106,7 +106,6 @@ def updateArtists(snapshot, artistList):
             snapshot[key] = [artistList[key]]
     return snapshot
 
-
 def getArtistName(artistId):
     userId = 'LqqarxhRAPhVF9CQcnSRtGzhSKS2'
     refreshToken = db.reference('/users/{}/accountInfo/tokens/RefreshToken'.format(userId)).get()
@@ -117,7 +116,6 @@ def getArtistName(artistId):
     response = requests.get('https://api.spotify.com/v1/artists/{}'.format(artistId), headers=headers)
     return response.json()['name']
 
-
 def getTrackName(trackId):
     userId = 'LqqarxhRAPhVF9CQcnSRtGzhSKS2'
     refreshToken = db.reference('/users/{}/accountInfo/tokens/RefreshToken'.format(userId)).get()
@@ -127,7 +125,6 @@ def getTrackName(trackId):
     }
     response = requests.get('https://api.spotify.com/v1/tracks/{}'.format(trackId), headers=headers)
     return response.json()['name']
-
 
 @bp.route('/addUser', methods=('GET', 'POST'))
 def addUser():
@@ -238,14 +235,36 @@ def addUser():
     # get user data from spotify
     # parse through data and add to hub
 
+def getTrackInfo(userId, trackId):
+    refreshToken = db.reference('/users/{}/accountInfo/tokens/RefreshToken'.format(userId)).get()
+    accessToken = exchangeTokens(refreshToken)
+    headers = {
+        'Authorization': 'Bearer ' + accessToken
+    }
+    response = requests.get('https://api.spotify.com/v1/tracks/{}'.format(trackId), headers=headers)
+    return response.json()
+
+@bp.route('/getRecentlyPlayed', methods=('GET', 'POST'))
+def getRecents():
+    userId = request.form['userId']
+    hubId = request.form['hubId']
+    recents = db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).get()
+    if recents:
+        return jsonify(getTrackInfo(userId, min(recents.keys(), key=(lambda key: recents[key]))))
+    else:
+        abort(500)
+
 @bp.route('/getNextSong', methods=('GET', 'POST'))
 def getNextSong():
+    userId = request.form['userId']
     hubId = request.form['hubId']
     data =  db.reference('/hubs/{}'.format(hubId)).get()
     songDict = data['songQueue']
     artistDict = data['artistQueue']
     recentlyPlayed =  db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).get()
     userCount = songDict['userCount']
+    if userCount == 0:
+        abort(500)
     temp = {}
     for key in songDict.keys():
         if key != 'userCount':
@@ -262,7 +281,7 @@ def getNextSong():
             nextSong = max(final.keys(), key=(lambda key: final[key][1]))
         incrementRecentlyPlayed(hubId)
     db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).update({ nextSong: 0 })
-    return jsonify(getTrackName(nextSong))
+    return jsonify(getTrackInfo(userId, nextSong))
 
 def incrementRecentlyPlayed(hubId, maxHistoryLength = 19): #up to 20 (maxHistoryLength + 1) songs will be remembered before replaying songs
     recents = db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).get()
@@ -276,9 +295,10 @@ def incrementRecentlyPlayed(hubId, maxHistoryLength = 19): #up to 20 (maxHistory
 @bp.route('/getPreviousSong', methods=('GET', 'POST'))
 def getPreviousSong():
     hubId = request.form['hubId']
+    userId = request.form['userId']
     recents = db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).get()
     recents = decrementRecentlyPlayed(hubId)
-    return getTrackName(min(recents.keys(), key=(lambda key: recents[key])))
+    return jsonify(getTrackInfo(userId, min(recents.keys(), key=(lambda key: recents[key]))))
 
 def decrementRecentlyPlayed(hubId):
     recents = db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).get()
@@ -302,3 +322,4 @@ def applyArtistWeight(toApply, Artists, userCount): #takes a dict, and a dict of
             if toApply[key2][0] == key:
                 toApply[key2] = [toApply[key2][0], getRating(Artists[key], userCount) + toApply[key2][1]] #apply weights somehow
     return toApply
+
