@@ -59,8 +59,10 @@ def getHubInfo():
     if request.method == 'GET':
         ids = db.reference('/hubs').get()
         for key in ids.keys():
-            temp.append(ids[key])
-            temp.update({'hubID': key})
+            retObj = {}
+            retObj.update(ids[key])
+            retObj.update({'hubID': key})
+            temp.append(retObj)
         print(ids.values())
         return jsonify(temp)
 
