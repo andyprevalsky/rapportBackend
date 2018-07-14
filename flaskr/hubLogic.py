@@ -16,10 +16,8 @@ cred = credentials.Certificate(serviceKey)
 firebase_admin.initialize_app(cred, {
     'databaseURL': 'https://musicapp-a40f1.firebaseio.com/'
 })
+
 db = firebase_admin.db
-
-
-
 REDIRECT_URI = 'soundhub://callback'
 S_CLIENT_ID = '5a7e235500fe40509dee5c659b63f316'
 S_CLIENT_SECRET = 'e551e52e22fa4caeacc4874a1c6a2fa9'
@@ -58,11 +56,8 @@ def getHubInfo():
     temp = []
     if request.method == 'GET':
         ids = db.reference('/hubs').get()
-        for key in ids.keys():
-            retObj = {}
-            retObj.update(ids[key])
-            retObj.update({'hubID': key})
-            temp.append(retObj)
+        for value in ids.values():
+            temp.append(value)
         print(ids.values())
         return jsonify(temp)
 
@@ -246,6 +241,13 @@ def getTrackInfo(userId, trackId):
     }
     response = requests.get('https://api.spotify.com/v1/tracks/{}'.format(trackId), headers=headers)
     return response.json()
+
+@bp.route('/deleteHub', methods=('GET', 'POST'))
+def deleteHub():
+    hubId = request.form['hubId']
+    userId = request.form['userId']
+    db.reference('/users/{}/accountInfo/hostingHubId'.format(userId)).delete()
+    db.reference('/hubs/{}'.format(hubId)).delete()
 
 @bp.route('/getRecentlyPlayed', methods=('GET', 'POST'))
 def getRecents():
