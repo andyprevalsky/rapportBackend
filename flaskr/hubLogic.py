@@ -55,7 +55,7 @@ def getUserData(accessToken, url, time_range=None):
 def getAccToken():
     userId = request.form['userId']
     refreshToken = db.reference('/users/{}/accountInfo/tokens/RefreshToken'.format(userId)).get()
-    return exchangeTokens(refreshToken)
+    return jsonify(exchangeTokens(refreshToken))
 
 @bp.route('/getHubs/', methods=('GET', 'POST'))
 def getHubInfo():
