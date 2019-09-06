@@ -19,8 +19,8 @@ firebase_admin.initialize_app(cred, {
 
 db = firebase_admin.db
 REDIRECT_URI = 'soundhub://callback'
-S_CLIENT_ID = '5a7e235500fe40509dee5c659b63f316'
-S_CLIENT_SECRET = 'e551e52e22fa4caeacc4874a1c6a2fa9'
+S_CLIENT_ID = 'cb443358fc6f47fc8b82c129cbb70440'
+S_CLIENT_SECRET = 'c357352a9115423495a8be6b79fb26c1'
 
 bp = Blueprint('hubs', __name__, url_prefix='/hubs')
 
@@ -54,8 +54,10 @@ def getUserData(accessToken, url, time_range=None):
 @bp.route('/getAccessToken', methods=('GET', 'POST'))
 def getAccToken():
     userId = request.form['userId']
-    refreshToken = db.reference('/users/{}/accountInfo/tokens/RefreshToken'.format(userId)).get()
-    return jsonify(exchangeTokens(refreshToken))
+    refreshToken = db.reference('/users/{}/RefreshToken'.format(userId)).get()
+    response = jsonify(exchangeTokens(refreshToken))
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
 
 @bp.route('/getHubs/', methods=('GET', 'POST'))
 def getHubInfo():
@@ -89,7 +91,9 @@ def createNewHub():
         ref.child('artistQueue').set({'userCount': 0})
         ref.child('recentlyPlayed')
         db.reference('/users/{}/accountInfo'.format(userId)).update({ 'hostingHubId': hubId })
-        return hubId
+        response = jsonify({"hubId": hubId})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
 
 def updateSongs(snapshot, songList):
     snapshot['userCount'] += 1
@@ -112,7 +116,7 @@ def updateArtists(snapshot, artistList):
 
 def getArtistName(artistId):
     userId = 'LqqarxhRAPhVF9CQcnSRtGzhSKS2'
-    refreshToken = db.reference('/users/{}/accountInfo/tokens/RefreshToken'.format(userId)).get()
+    refreshToken = db.reference('/users/{}/RefreshToken'.format(userId)).get()
     accessToken = exchangeTokens(refreshToken)
     headers = {
         'Authorization': 'Bearer ' + accessToken
@@ -120,9 +124,8 @@ def getArtistName(artistId):
     response = requests.get('https://api.spotify.com/v1/artists/{}'.format(artistId), headers=headers)
     return response.json()['name']
 
-def getTrackName(trackId):
-    userId = 'LqqarxhRAPhVF9CQcnSRtGzhSKS2'
-    refreshToken = db.reference('/users/{}/accountInfo/tokens/RefreshToken'.format(userId)).get()
+def getTrackName(trackId, userId):
+    refreshToken = db.reference('/users/{}/RefreshToken'.format(userId)).get()
     accessToken = exchangeTokens(refreshToken)
     headers = {
         'Authorization': 'Bearer ' + accessToken
@@ -141,7 +144,7 @@ def addUser():
     favoritesURL = 'https://api.spotify.com/v1/me/top/'
     userId = request.form['user_id']
     hubId = request.form['hub_id']
-    refreshToken = db.reference('/users/{}/accountInfo/tokens/RefreshToken'.format(userId)).get()
+    refreshToken = db.reference('/users/{}/RefreshToken'.format(userId)).get()
     accessToken = exchangeTokens(refreshToken)
 
     # queueRef.transaction(lambda snapshot: updateSongs(snapshot))
@@ -234,13 +237,14 @@ def addUser():
         rankWeight -= .02
 
     db.reference('/hubs/{}/artistQueue'.format(hubId)).transaction(lambda snapshot: updateArtists(snapshot, artistList))
-
-    return ('Finished Processing the Data!')
+    response = jsonify({"TEXT" : 'Finished Processing the Data!'})
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
     # get user data from spotify
     # parse through data and add to hub
 
 def getTrackInfo(userId, trackId):
-    refreshToken = db.reference('/users/{}/accountInfo/tokens/RefreshToken'.format(userId)).get()
+    refreshToken = db.reference('/users/{}/RefreshToken'.format(userId)).get()
     accessToken = exchangeTokens(refreshToken)
     headers = {
         'Authorization': 'Bearer ' + accessToken
@@ -261,7 +265,9 @@ def getRecents():
     hubId = request.form['hubId']
     recents = db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).get()
     if recents:
-        return jsonify(getTrackInfo(userId, min(recents.keys(), key=(lambda key: recents[key]))))
+        response = jsonify(getTrackInfo(userId, min(recents.keys(), key=(lambda key: recents[key]))))
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
     else:
         abort(500)
 
@@ -282,8 +288,13 @@ def getNextSong():
             temp[key] = [songDict[key][0], getRating(songDict[key], userCount)] #make a new dict with keys of id, -> artist,rating
     final = (applyArtistWeight(temp, artistDict, userCount))
     temp = {}
-    # for key in final.keys():
-    #     temp[final[key][1]] = getTrackName(key)
+    for key in final.keys():
+        temp[final[key][1]] = getTrackName(key, userId)
+    a = []
+    for key in temp.keys():
+        a.append([key, temp[key]])
+    a.sort()
+    print(a)
     # return (jsonify(temp))
     nextSong = max(final.keys(), key=(lambda key: final[key][1]))
     if recentlyPlayed:
@@ -292,7 +303,9 @@ def getNextSong():
             nextSong = max(final.keys(), key=(lambda key: final[key][1]))
         incrementRecentlyPlayed(hubId)
     db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).update({ nextSong: 0 })
-    return jsonify(getTrackInfo(userId, nextSong))
+    response = jsonify(getTrackInfo(userId, nextSong))
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
 
 def incrementRecentlyPlayed(hubId, maxHistoryLength = 19): #up to 20 (maxHistoryLength + 1) songs will be remembered before replaying songs
     recents = db.reference('/hubs/{}/recentlyPlayed'.format(hubId)).get()

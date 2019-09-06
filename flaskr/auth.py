@@ -7,9 +7,9 @@ from flask import (
     Blueprint, redirect, request, jsonify
 )
 
-REDIRECT_URI = 'soundhub://callback'
-S_CLIENT_ID = '5a7e235500fe40509dee5c659b63f316'
-S_CLIENT_SECRET = 'e551e52e22fa4caeacc4874a1c6a2fa9'
+REDIRECT_URI = 'http://localhost:3000/'
+S_CLIENT_ID = 'cb443358fc6f47fc8b82c129cbb70440'
+S_CLIENT_SECRET = 'c357352a9115423495a8be6b79fb26c1'
 
 
 bp = Blueprint('auth', __name__, url_prefix='/auth')
@@ -29,7 +29,9 @@ def grabToken():
   if request.method == 'POST':
     body['code'] = request.form['code']
     response = requests.post('https://accounts.spotify.com/api/token', data=urlencode(body), headers=headers)
-    return jsonify(response.json())
+    response = jsonify(response.json())
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
   return ('NO POST')
 
 def exchangeTokens(refreshToken):
@@ -56,6 +58,8 @@ def refreshToken():
   }
   if request.method == 'POST':
     response = requests.post('https://accounts.spotify.com/api/token', data=urlencode(body), headers=headers)
-    return jsonify(response.json())
+    response = jsonify(response.json())
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
   return ('NO POST')
 
